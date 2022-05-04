@@ -34,9 +34,11 @@ sns.set_theme(style="ticks")
 
 ## Congressional Speeches and Immigration Grades
 
-Now we want to load in the data that was used to train the BERT slant model. Because these datasets are very large, they are not available in this repo. If you'd like access to this data, send me an email!
+Now we want to load in the data that was used to train the BERT immigration sentiment model. Because these datasets are very large, they are not available in this repo. If you'd like access to this data, send me an email!
 
-The data consists of speeches about immigration given by politicians during the 111th-114th Congresses (2009-2016) paired with how an anti-immigration think-tank rates those politicians. The speeches come from Gentzkow, Shapiro and Taddy (2019), who collected the data from the Congressional Record. They cleaned and parsed the speeches, making them far easier to work with. The "immigration grades" come from NumbersUSA, an anti-immigration think-tank that lobbies Congress for lower levels of immigration to the U.S. They rate politicians on how anti-immigration they are, based on their voting record. These grades range from A+ to F-. Politicians that always vote for lower immigration levels to the U.S. receive a grade of A+, whereas politicians that consistently support an agenda to increase immigration levels to the U.S. will receive lower grades, like an F-. 
+The data consists of speeches about immigration given by politicians during the 111th-114th Congresses (2009-2016) paired with how an anti-immigration think-tank rates those politicians. The speeches come from Gentzkow, Shapiro and Taddy (2019), who collected the data from the Congressional Record. They cleaned and parsed the speeches, making them far easier to work with. 
+
+The "immigration grades" come from NumbersUSA, an anti-immigration think-tank that lobbies Congress for lower levels of immigration to the U.S. They rate politicians on how anti-immigration they are, based on their voting record. These grades range from A+ to F-. Politicians that always vote for lower immigration levels to the U.S. receive a grade of A+, whereas politicians that consistently support an agenda to increase immigration levels to the U.S. will receive lower grades, like an F-. 
 
 
 ```python
@@ -85,19 +87,6 @@ pprint(immig_training_data.sample(n=5, random_state=1))
     2237     F      12            2            0  
     4816    C+      61            8            1  
     636      F      14            2            0  
-
-
-
-```python
-pprint(immig_training_data[immig_training_data.grade == "F-"].speech.sample(n=5, random_state=10))
-```
-
-    4942    i agree with my colleagues on the other side o...
-    2535    mr. speaker. i have spent the past year speaki...
-    2540    mr. speaker. i thank the gentleman from texas ...
-    582     mr. speaker. when we got our first color tv. i...
-    5466    i thank the gentleman. heres what id like to d...
-    Name: speech, dtype: object
 
 
 Here is an example of a speech from a politician who receives a grade of A+ from NumbersUSA, Represenative Lou Barletta: 
@@ -166,14 +155,16 @@ plt.show()
 
 
     
-![png](README_files/README_13_0.png)
+![png](README_files/README_12_0.png)
     
 
 
 
 ## Bert Model Fine-Tuning 
 
-Having illustrated the key sources of variation, we are now ready to fine-tune our BERT model to recognize sentiment about immigration in political speech. The "features" are the text of the speeches, and the target labels are the immigration grades. I convert the grades to numeric values and (min-max) normalize them to fall between 0 and 1 in order to speed up training. Because these grades vary continously, I train the model using a regression task (adding a final linear layer to the BERT model). To converge on a final model, I used WandB sweeps to tune the two most important hyperparameters of these models, the learning rate and the number of epochs. Because these models are very costly to train, I do not do this here. You can see the code for this in scripts/3-immig-sent-sweep.py. The results from training these models on powerful cloud computing systems with GPUs on the UZH science cloud platform are presented below from WandB:
+Having illustrated the key sources of variation, we are now ready to fine-tune our BERT model to recognize sentiment about immigration in political speech. The "features" are the text of the speeches, and the target labels are the immigration grades. I use the continuous version of this grade from NumbersUSA ("rating" in the data) and min-max normalize them to fall between 0 and 1 in order to speed up training. I train the model using a regression task (adding a final linear layer to the BERT model). 
+
+To converge on a final model, I used WandB sweeps to tune the two most important hyperparameters of these models, the learning rate and the number of epochs. Because these models are very costly to train, I do not do this here. You can see the code for this in scripts/3-immig-sent-sweep.py. The results from training these models on powerful cloud computing systems with GPUs on the UZH science cloud platform are presented below from WandB:
 
 ![image](wandb-figures/hyperparameter-tuning.png)
 
@@ -181,9 +172,9 @@ After many runs of the model, I converged on a learning rate of about 2e-05 and 
 
 ![image](wandb-figures/model.png)
 
-## Running the Fine-tuned Model on the Cable News Corpus
+## Running the Fine-Tuned Model on the Cable News Corpus
 
-I then ran this model on my dataset of cable news broadcasts, restricted to cable news segments that contains a term related to immigration (at least one word that reduces to the stem word "immigr".). Given the words used in the cable news segments, the model yields predicted immigration grades for those segments. I load these results in, and merge them to some metadata so we can start to explore slant on the media. 
+I then ran this model on my dataset of cable news broadcasts, restricted to cable news segments that contains a term related to immigration (at least one word that reduces to the stem word "immigr"). Given the words used in the cable news segments, the model yields predicted immigration grades for those segments. I load these results in, and merge them to some metadata so we can start to explore immigration sentiment on cable news. 
 
 
 ```python
@@ -222,7 +213,7 @@ media_immig_sentiment = media_immig_sentiment.merge(tv_archive_data, on="id", ho
 
 Here I plot the distribution of estimated immigration sentiment by channel among cable news segments that are about immigration. immigration_sentiment is the normalized form of the immigration grades, and varies from 0 to 1 where higher values indicate more anti-immigrant language. Because the channels differ in the extent to which they discuss immigration (Fox News discusses it the most), I normalize the distributions by channel to make them easier to compare visually.
 
-What immediately stands out is that Fox News exhibits far more segments with anti-immigrant language and far fewer pro-immigrant segments, as measured by the trained BERT immigration sentiment model. Both CNN and MSNBC exhibit far more pro-immigrant segments, with MSNBC exhibiting the most pro-immigrant segments. 
+What immediately stands out is that Fox News exhibits far more segments with anti-immigrant language and far fewer pro-immigrant segments, as measured by the trained BERT immigration sentiment model. Both CNN and MSNBC exhibit more pro-immigrant segments, with MSNBC exhibiting the most pro-immigrant segments. 
 
 What this means intuitively is that when discussing immigration, the model thinks that Fox News tends to use the type of language that anti-immigrant politicians in Congress use, while CNN and especially MSNBC tend to use the type of language that is associated with pro-immigrant politicians in Congress. 
 
@@ -235,7 +226,7 @@ plt.show()
 
 
     
-![png](README_files/README_21_0.png)
+![png](README_files/README_20_0.png)
     
 
 
